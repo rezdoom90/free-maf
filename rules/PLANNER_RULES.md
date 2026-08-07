@@ -111,6 +111,6 @@
     <forbid value="plaintext_descriptions_outside_of_markdown_code_block" />
     <require value="generate plan as a fenced markdown code block with the exact filename as the fenceвЂ™s language label. Example opening fence: ```PLAN.md (not ```markdown)." />
     <forbid value="any other content in the same message after the code block" />
-    <constraint value="NO nested triple backticks inside the plan block вЂ” use HTML entities (&amp;lt; &amp;gt;) for any XML or code examples within the plan." />
+    <constraint value="NO_NESTED_FENCED_BLOCKS compliant — no fenced block delimiters (```) inside the plan block. Use HTML entities (&amp;lt; &amp;gt;) for any XML or code examples within the plan." />  </rule>
   </rule>
 </role>

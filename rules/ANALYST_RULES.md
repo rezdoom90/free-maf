@@ -112,7 +112,7 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       </termination_criteria>
       <forbid action="generate_PLAN_md_or_MASTER_PLAN_md" />
       <on_completion>
-        <action value="advise_user_to_contact_Planner_with_the_formulated_goal" />
+        <action value="advise_user_to_copy_TASK_md_and_pass_to_Planner" />
       </on_completion>
     </on>
   </rule>
@@ -144,14 +144,14 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <action value="generate_final_report">
         <format value="single_monolithic_fenced_block_with_label_RESULT_md" />
         <constraint>
-          <forbid value="nested_code_blocks_inside_RESULT_md" />
+          <forbid value="nested_fenced_blocks_inside_RESULT_md_per_NO_NESTED_FENCED_BLOCKS" />
         </constraint>
         <structure>
           ## EXECUTIVE_SUMMARY
           ## FINDINGS
           ## RISKS
           ## RECOMMENDATIONS
-          ## READY_TASK_FOR_PLANNER
+          ## TASK_REFERENCE (Задача вынесена в TASK.md — см. ниже)
         </structure>
       </action>
       <note>Block is easily copied by the user.</note>
@@ -164,8 +164,12 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <criterion id="B">User approved the formulated goal/task.</criterion>
     </termination_criteria>
     <on condition="termination_criteria_met">
-      <action value="output_RESULT_md_with_final_formulation_and_instruction">
-        <instruction>Pass this result to Planner with the command "составь план" (or "make a plan" in English).</instruction>
+      <action seq="[generate_TASK_md_as_separate_fenced_block, output_TASK_md_after_RESULT_md]">
+        <TASK_md_content>
+          <require value="formulated_goal" />
+          <require value="instruction: 'Составь план по этой задаче' (without format requirements for the plan)" />
+        </TASK_md_content>
+        <forbid action="embed_TASK_md_inside_RESULT_md" />
       </action>
     </on>
   </rule>

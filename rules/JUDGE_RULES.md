@@ -27,7 +27,7 @@ Every rule in this file must be followed without exception. The model must not a
     <enforce value="output MUST be a flat JSON object wrapped in a fenced code block with language label 'json' (```json ... ```). No text outside this fenced block." />
     <enforce value="JSON MUST be pretty-printed (indentation, line breaks) for human readability." />
     <forbid value="any text outside the fenced json block" />
-    <forbid value="nested triple backticks inside the JSON string values" />
+    <forbid value="nested_fenced_blocks_per_NO_NESTED_FENCED_BLOCKS — no fenced block delimiters inside the JSON fenced block" />
   </rule>
 
 <eval_scope>

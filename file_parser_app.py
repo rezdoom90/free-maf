@@ -333,6 +333,7 @@ class FileParserApp:
         self.progressbar = None
         self.tree_visible = True
         self._poll_interval_ms = 3000
+        self._opening_file = False
 
         paned = ttk.PanedWindow(root, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True)
@@ -351,6 +352,7 @@ class FileParserApp:
         self.tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         self.tree.bind("<ButtonRelease-1>", self._on_tree_click)
+        self.tree.bind("<Double-1>", self._on_double_click)
 
         # Zebra tags (placed here to have access to TREE_BG, TREE_FG)
         self.tree.tag_configure('even', background="#2E2E2E", foreground="#DCDCDC")
@@ -392,7 +394,7 @@ class FileParserApp:
         btn_map_only.pack(pady=2, padx=10, fill=tk.X)
         ToolTip(btn_map_only, "Regenerate and copy MAP.md only (ignores file selection)")
 
-        self.status_label = ttk.Label(right_frame, text="Ready")
+        self.status_label = ttk.Label(right_frame, text="Double-click a file to open | Ready")
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
 
         self.project_root = get_project_root()
@@ -517,7 +519,7 @@ class FileParserApp:
                 self.folder_was_checked[iid] = False
         for root_iid in self.tree.get_children(''):
             self.tree.item(root_iid, open=True)
-        self.status_label.config(text="Ready")
+        self.status_label.config(text="Double-click a file to open | Ready")
 
     # -----------------------------------------------------------------
     # Event handler
@@ -538,6 +540,43 @@ class FileParserApp:
             self._toggle_item(iid)
         except Exception as e:
             print(f"[ERROR] Tree click handler: {e}")
+
+    TEXT_EXTENSIONS = {'.md', '.py', '.java', '.xml', '.json', '.bat', '.ps1', '.txt', '.yml', '.properties', '.cfg', '.config'}
+
+    def _on_double_click(self, event):
+        """Open file on double-click with debouncing and extension filtering."""
+        if self._opening_file:
+            return
+        try:
+            iid = self.tree.identify_row(event.y)
+            if not iid:
+                return
+            tags = self.tree.item(iid, "tags")
+            if "dir" in tags:
+                return
+            rel_path = self.iid_to_relpath.get(iid, "")
+            if not rel_path:
+                return
+            ext = os.path.splitext(rel_path)[1].lower()
+            if ext not in self.TEXT_EXTENSIONS:
+                return
+            self._opening_file = True
+            abs_path = self.project_root / rel_path
+            if sys.platform == 'win32':
+                os.startfile(abs_path)
+            elif sys.platform == 'darwin':
+                subprocess.run(['open', str(abs_path)])
+            else:
+                subprocess.run(['xdg-open', str(abs_path)])
+            self.status_label.config(text=f"Opened: {rel_path}")
+            self.root.after(500, self._reset_opening_flag)
+        except Exception as e:
+            self._opening_file = False
+            print(f"[ERROR] Double-click handler: {e}")
+
+    def _reset_opening_flag(self):
+        self._opening_file = False
+        self.status_label.config(text="Double-click a file to open | Ready")
 
     def _toggle_item(self, iid):
         current = self.check_states.get(iid, False)

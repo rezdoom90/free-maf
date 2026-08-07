@@ -62,9 +62,10 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
   <rule id="OUTPUT_FORMAT">
     <on condition="result_ready">
       <action value="wrap_output_in_fenced_block">
-        <allowed_labels>[RESULT.md, COMPARISON_TABLE.md, LINKS.md]</allowed_labels>
+        <allowed_labels>[RESULT.md, WEB_RESPONSE.md, COMPARISON_TABLE.md, LINKS.md]</allowed_labels>
+        <note>WEB_RESPONSE.md — основной ответ на QUERY.md. Дополнительные артефакты (COMPARISON_TABLE.md, LINKS.md) выводятся отдельными fenced-блоками после основного ответа.</note>
         <constraint>
-          <forbid value="nested_triple_backticks_inside_fenced_block" />
+          <forbid value="nested_fenced_blocks_per_NO_NESTED_FENCED_BLOCKS" />
         </constraint>
       </action>
       <forbid value="plaintext_outside_fenced_block_for_final_result" />
@@ -81,8 +82,23 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
 
   <rule id="VERIFY_AND_CITE">
     <on condition="information_provided">
-      <action seq="[attach_source_links, honestly_report_if_information_not_found]" />
+      <action seq="[attach_source_links_with_verification_status, honestly_report_if_information_not_found]" />
+      <require value="for_each_link_indicate_verification_status: [HTTP_CODE, accessible/inaccessible]" />
       <forbid action="fabricate_information_or_sources" />
     </on>
+  </rule>
+
+  <rule id="MANDATORY_LINK_VERIFICATION">
+    <severity value="CRITICAL" />
+    <on condition="output_contains_links">
+      <action seq="[verify_link_availability_via_curl_or_direct_HTTP_request, accept_only_HTTP_2xx_or_3xx]">
+        <forbid action="emit_unverified_or_dead_links" />
+      </action>
+      <on condition="link_unavailable">
+        <action seq="[search_for_alternative, report_honestly_if_no_alternative_found]" />
+        <forbid action="emit_dead_link_without_warning" />
+      </on>
+    </on>
+    <rationale>Prevents broken references and ensures all cited sources are accessible at the time of output.</rationale>
   </rule>
 </role>
