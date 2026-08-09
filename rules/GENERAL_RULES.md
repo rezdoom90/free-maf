@@ -75,10 +75,42 @@ All rules in this file are unconditional. The model MUST follow them regardless 
   </directive>
 
   <directive id="COMPLETE_EXECUTION">
+    <severity value="CRITICAL" />
     <forbid action="shrink_scope" />
     <on_heavy_task>
       <action seq="[decompose_into_stages, notify_user_of_stages, execute_until_100_percent_completion]" />
+      <require value="execute_complex_or_voluminous_tasks_in_DIFFERENT_MESSAGES_with_user_confirmation_after_each_stage" />
     </on_heavy_task>
+    <constraint id="DIFF_LIMITS">
+      <rule id="MAX_DIFFS_PER_RESPONSE">
+        <limit value="10" />
+        <description>≤10 diffs per response = acceptable. >10 = unacceptable (high risk of user error).</description>
+      </rule>
+      <rule id="NO_DUPLICATE_BLOCKS_ACROSS_DIFFS">
+        <forbid action="modify_same_block_in_different_diffs_within_one_response" />
+        <rationale>After the first diff is applied, the block is changed; subsequent diffs referencing the same original block will fail or produce corrupted results.</rationale>
+      </rule>
+    </constraint>
+    <exception condition="file_length_approximately_300_lines_or_less">
+      <allow value="single_message_execution_if_context_window_sufficient" />
+    </exception>
+  </directive>
+
+  <directive id="NO_MID_RESPONSE_FLIP_FLOP">
+    <severity value="CRITICAL" />
+    <scope value="ALL_ROLES" />
+    <constraint>
+      <forbid action="change_opinion_or_redefine_result_outside_thinking_within_same_response" />
+      <forbid action="contradict_previously_stated_position_in_same_response_body" />
+      <allow condition="genuine_uncertainty">
+        <action value="present_2_or_more_variants_with_explicit_explanation_of_principal_difference" />
+      </allow>
+    </constraint>
+    <rationale>
+      Mid-response contradictions confuse users and downstream parsers.
+      Agent must commit to a position or explicitly offer alternatives,
+      not flip-flop within a single response body outside thinking tags.
+    </rationale>
   </directive>
 
   <directive id="ROOT_CAUSE_ONLY">
@@ -222,10 +254,16 @@ blocks unless tightly constrained.
   </rule>
 
   <rule id="STRICT_DIFF">
+    <severity value="CRITICAL" />
     <output_format value="EXPLICIT_BLOCK_REPLACEMENT" />
     <enforce>
       <block name="original" label="existing code/text:">
         <require value="verbatim copy of the fragment to be replaced, no abbreviations, no placeholders" />
+        <require value="fragment_MUST_appear_in_target_file_EXACTLY_ONCE" />
+        <on condition="fragment_appears_multiple_times">
+          <action value="expand_fragment_until_unique" />
+          <forbid action="emit_diff_with_ambiguous_original" />
+        </on>
       </block>
       <block name="replacement" label="replace with code/text:">
         <require value="verbatim new fragment" />
@@ -237,6 +275,7 @@ blocks unless tightly constrained.
         <allow value="specify_name_of_block_to_replace (method/class/chapter) and provide only the new block" />
       </fallback>
     </enforce>
+    <rationale>Ambiguous original blocks cause unpredictable replacements. Uniqueness guarantees deterministic application.</rationale>
   </rule>
 
   <rule id="MENTAL_SYNTAX_CHECK">

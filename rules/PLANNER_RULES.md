@@ -82,6 +82,15 @@
     <assert value="expected_rework_iterations == 0" />
   </rule>
 
+  <rule id="DOCUMENTATION_UPDATE" severity="CRITICAL">
+    <on condition="project_has_attached_documentation AND planned_changes_affect_functionality_logic_narrative_or_interaction_principles">
+      <require action="append_documentation_update_steps_to_plan">
+        <rationale>Documentation must stay in sync with the changes being made. Planner is responsible for ensuring this by adding explicit documentation update steps at the end of the plan.</rationale>
+        <scope value="project_documentation_excluding_auto_generated_state_files" />
+      </require>
+    </on>
+  </rule>
+
   <rule id="VERIFIABILITY">
     <for_each item="step" in="plan.steps">
       <assert eval="is_binary_testable(step)" />

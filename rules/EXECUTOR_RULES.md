@@ -48,6 +48,22 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <forbid action="emit_paragraphs_explaining_what_will_be_done" />
       <allow only="STRICT_DIFF or WIP.md content or [Step X/Y] prefix" />
     </constraint>
+    <constraint id="ORIGINAL_BLOCK_UNIQUENESS" severity="CRITICAL">
+      <before action="emit_diff">
+        <require value="original_block_appears_in_target_file_EXACTLY_ONCE" />
+        <on condition="original_block_not_unique">
+          <action value="expand_fragment_until_unique" />
+          <forbid action="emit_diff_with_ambiguous_original" />
+        </on>
+      </before>
+    </constraint>
+    <constraint id="ALL_PLAN_STEPS_MANDATORY" severity="CRITICAL">
+      <require value="execute_all_steps_of_PLAN_md_sequentially" />
+      <forbid action="propose_skipping_steps_without_compelling_reason" />
+      <allow action="skip_step" condition="user_explicitly_demanded" />
+      <allow action="skip_step" condition="previous_work_already_covers_step_result" />
+      <allow action="skip_step" condition="step_contradicts_final_result_with_user_discussion" />
+    </constraint>
   </rule>
 
   <rule id="PROGRESS_INDICATOR">
@@ -60,7 +76,19 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
 
   <rule id="DEEPSEEK_DIFF_HYGIENE" condition="host_llm == 'DeepSeek'">
     <forbid action="preface_diff_with_prose" />
-    <note value="DeepSeek tends to add вЂHere is the diff:вЂ™. Always start the diff block immediately after the step prefix, no introductory sentence. This rule is inactive for non-DeepSeek hosts." />
+    <note value="DeepSeek tends to add Here is the diff:™. Always start the diff block immediately after the step prefix, no introductory sentence. This rule is inactive for non-DeepSeek hosts." />
+  </rule>
+
+  <rule id="NO_DUPLICATE_ORIGINS_IN_SINGLE_RESPONSE" severity="CRITICAL">
+    <forbid action="emit_2_or_more_diffs_with_identical_original_blocks_in_same_response" />
+    <constraint>
+      <define term="one_diff" value="exactly_two_blocks: original and replacement" />
+      <require format="original: <filename>" />
+      <require format="replacement: <filename>" />
+      <forbid value="plus_or_minus_signs_at_line_start" />
+      <forbid value="line_numbers_in_diff" />
+    </constraint>
+    <rationale>After the first diff is applied, the original block is changed; subsequent diffs referencing the same original will fail.</rationale>
   </rule>
 
   <rule id="UPDATE_WIP">
@@ -138,6 +166,13 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
         <forbid value="cascading_global_rewrites" />
       </allow>
     </dependencies>
+    <constraint id="ALL_AFFECTED_FILES_CHECK" severity="CRITICAL">
+      <require value="identify_all_files_affected_by_plan_changes" />
+      <require value="request_affected_files_from_user" />
+      <require value="verify_functionality_of_affected_files" />
+      <require value="fix_if_broken" />
+      <forbid action="proceed_without_verifying_all_affected_files" />
+    </constraint>
   </rule>
 
   <rule id="CAPACITY_AWARE_EXECUTION">

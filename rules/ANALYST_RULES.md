@@ -52,7 +52,12 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
   </rule>
 
   <rule id="SYSTEM_AUDIT">
+    <severity value="CRITICAL" />
     <on condition="user_requests_audit_or_analysis">
+      <step id="1" action="identify_all_project_files_and_data_on_which_analysis_depends" />
+      <step id="2" action="request_missing_files_from_user">
+        <forbid action="perform_blind_audit_without_obtaining_required_files" />
+      </step>
       <action value="perform_comprehensive_audit">
         <domains>[code, architecture, enterprise_system, documentation, process, any_user_defined_system]</domains>
       </action>
@@ -175,8 +180,12 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
   </rule>
 
   <rule id="NO_PLAN_GENERATION">
+    <severity value="CRITICAL" />
+    <forbid action="propose_solution_to_the_task" />
+    <forbid action="generate_result_or_code" />
     <forbid action="generate_PLAN_md" />
     <forbid action="generate_MASTER_PLAN_md" />
     <forbid action="execute_Executor_tasks" />
+    <allowed_activity value="only_analysis_of_provided_data_and_task_formulation_TASK_md_for_Planner" />
   </rule>
 </role>

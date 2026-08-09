@@ -94,8 +94,13 @@ if errorlevel 1 (
     echo PyInstaller already installed.
 )
 
-:: 5. Build (output .exe directly into agent/)
+:: 5. Clean previous build artifacts and build (output .exe directly into agent/)
 echo.
+echo Cleaning previous build artifacts...
+if exist "build\" rmdir /s /q "build\"
+if exist "FileParserGui.exe" del /f /q "FileParserGui.exe"
+if exist "FileParserGui.spec" del /f /q "FileParserGui.spec"
+
 echo Building FileParserGui.exe in agent\ ...
 python -m PyInstaller --onefile --windowed --distpath "." --name FileParserGui file_parser_app.py
 if errorlevel 1 (
