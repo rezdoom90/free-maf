@@ -801,7 +801,7 @@ class FileParserApp:
                 except (UnicodeDecodeError, LookupError):
                     pass
             # Fallback to sequential encoding detection
-            encodings = ['utf-8-sig', 'utf-16', 'latin-1']
+            encodings = ['utf-8-sig', 'utf-16', 'windows-1251', 'latin-1']
             last_error = None
             for enc in encodings:
                 try:
