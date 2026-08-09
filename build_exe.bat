@@ -79,7 +79,20 @@ if errorlevel 1 (
     )
 )
 
-:: 4. Check / install PyInstaller
+:: 4. Install chardet
+echo Checking chardet...
+python -m pip show chardet >nul 2>&1
+if errorlevel 1 (
+    echo Installing chardet...
+    python -m pip install chardet --quiet
+    if errorlevel 1 (
+        echo chardet installation error. Run manually: pip install chardet
+        pause
+        exit /b 1
+    )
+)
+
+:: 5. Check / install PyInstaller
 echo Checking PyInstaller...
 python -m pip show pyinstaller >nul 2>&1
 if errorlevel 1 (
@@ -94,7 +107,7 @@ if errorlevel 1 (
     echo PyInstaller already installed.
 )
 
-:: 5. Clean previous build artifacts and build (output .exe directly into agent/)
+:: 6. Clean previous build artifacts and build (output .exe directly into agent/)
 echo.
 echo Cleaning previous build artifacts...
 if exist "build\" rmdir /s /q "build\"

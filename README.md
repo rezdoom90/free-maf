@@ -108,7 +108,7 @@ Multi-Agent Framework превращает обычный текстовый ч�
 
 ### Запуск .py скрипта без компиляции
 Если Python уже установлен, вы можете запустить File Parser GUI напрямую, без сборки .exe:
-1. Установите зависимость: `pip install pyperclip`
+1. Установите зависимости: `pip install pyperclip chardet`
 2. Запустите скрипт командой: `python agent/file_parser_app.py`
 
 ### Сборка автономного .exe

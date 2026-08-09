@@ -11,6 +11,7 @@ import sys
 import json
 import subprocess
 import traceback
+import chardet
 import time
 from pathlib import Path
 import tkinter as tk
@@ -787,9 +788,33 @@ class FileParserApp:
     def _read_file_safe(self, rel_path: str) -> str:
         abs_path = self.project_root / rel_path
         try:
-            with open(abs_path, 'r', encoding='utf-8') as f:
-                return f.read()
+            with open(abs_path, 'rb') as f:
+                raw = f.read()
+            result = chardet.detect(raw)
+            encoding = result.get('encoding')
+            confidence = result.get('confidence', 0)
+            if encoding and confidence > 0.7:
+                try:
+                    content = raw.decode(encoding)
+                    print(f"[OK] {rel_path} ({encoding}, confidence={confidence:.2f})")
+                    return content
+                except (UnicodeDecodeError, LookupError):
+                    pass
+            # Fallback to sequential encoding detection
+            encodings = ['utf-8-sig', 'utf-16', 'latin-1']
+            last_error = None
+            for enc in encodings:
+                try:
+                    content = raw.decode(enc)
+                    print(f"[OK] {rel_path} ({enc})")
+                    return content
+                except UnicodeDecodeError as e:
+                    last_error = e
+                    continue
+            print(f"[SKIP] {rel_path}: {type(last_error).__name__} — {last_error}")
+            raise IOError(f"Failed to read {rel_path}: {last_error}")
         except Exception as e:
+            print(f"[SKIP] {rel_path}: {type(e).__name__} — {e}")
             raise IOError(f"Failed to read {rel_path}: {e}")
 
     def _copy_to_clipboard(self, text: str):
@@ -907,13 +932,27 @@ class FileParserApp:
 
             # Non-critical missing files (PROJECT_STATE.md, INFRASTRUCTURE.md, QUERY.md, MAP.md) are silently skipped.
 
+            print(f"Прочитано: {files_read_ok}, пропущено: {len(skipped_status)}")
+
+            if skipped_status and files_read_ok > 0:
+                detail_lines = [f"• {p}" for p in skipped_status[:3]]
+                if len(skipped_status) > 3:
+                    detail_lines.append(f"…и ещё {len(skipped_status) - 3} файлов")
+                messagebox.showwarning(
+                    "Пропущены файлы",
+                    "Не удалось прочитать следующие файлы:\n" + "\n".join(detail_lines)
+                )
+
             if skipped_status:
                 self.status_label.config(text=f"Skipped {len(skipped_status)} unreadable file(s): {', '.join(skipped_status[:3])}...")
                 self.root.update_idletasks()
                 self.root.after(5000, lambda: self.status_label.config(text="Ready"))
 
             if files_read_ok == 0:
-                messagebox.showinfo("Nothing to copy", "No readable files found.")
+                msg = "Не удалось прочитать ни одного файла."
+                if skipped_status:
+                    msg += f" {len(skipped_status)} файл(ов) пропущено — подробности в окне предупреждения."
+                messagebox.showinfo("Nothing to copy", msg)
                 return
 
             final_text = "".join(output_parts)
