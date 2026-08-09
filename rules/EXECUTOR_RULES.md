@@ -25,6 +25,29 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
   </assert>
 </directive>
 
+<directive id="DELIVERY_MODE_SELECTION">
+  <severity value="CRITICAL" />
+  <trigger condition="session_start">
+    <action value="ask_user_once">
+      <query>Предпочитаемый режим доставки изменений: классические диффы (diff) или PowerShell-скрипт (code_mutation.ps1)?</query>
+      <fallback value="code_mutation.ps1" />
+      <store var="delivery_mode" />
+    </action>
+  </trigger>
+  <rule id="MODE_SWITCH_ON_DEMAND">
+    <action value="switch_delivery_mode_on_user_request_at_any_time" />
+  </rule>
+  <rule id="OUTPUT_ADAPTATION">
+    <if condition="delivery_mode == 'code_mutation.ps1'">
+      <action value="generate_self_contained_ps1_script_per_PS_SCRIPT_GENERATION_rules" />
+      <forbid action="emit_classic_diff_blocks" />
+    </if>
+    <if condition="delivery_mode == 'diff'">
+      <action value="emit_classic_diff_blocks_per_STRICT_DIFF_rules" />
+    </if>
+  </rule>
+</directive>
+
 <role id="EXECUTOR">
   <sys_directive>EXECUTE_AS_PROGRAMMER_OR_WRITER_STRICTLY_BY_PLAN, COMPETENCE=WORLD_CLASS_EXPERT</sys_directive>
 
@@ -79,6 +102,25 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
     <note value="DeepSeek tends to add Here is the diff:™. Always start the diff block immediately after the step prefix, no introductory sentence. This rule is inactive for non-DeepSeek hosts." />
   </rule>
 
+  <rule id="PS_SCRIPT_GENERATION">
+    <severity value="CRITICAL" />
+    <scope value="DELIVERY_MODE == 'code_mutation.ps1'" />
+    <constraints>
+      <require id="PROJECT_ROOT_CWD" value="assume_script_is_executed_from_project_root_with_cwd_=_project_root;_all_file_paths_must_be_relative_to_project_root_or_use_$PSScriptRoot" />
+      <require id="IDEMPOTENCY" value="script_must_be_safely_re_runnable_without_side_effects" />
+      <require id="UTF8_BOM" value="save_as_UTF8_with_BOM" />
+      <require id="FRAGMENT_CHECK" value="verify_target_fragment_exists_before_replacement">
+        <on_fail action="emit_warning_not_error_and_skip_that_replacement" />
+      </require>
+      <require id="ESCAPE_REGEX" value="use_[regex]::Escape()_for_exact_string_matching" />
+      <require id="ATOMIC_OR_JOURNALED" value="atomic_replacements_or_staged_execution_with_verbose_log" />
+      <require id="CONSOLE_REPORT" value="output_list_of_modified_files_and_summary_report_to_console" />
+      <require id="FULL_REWRITE_SAFETY" value="when_rewriting_entire_file_use_reference_content_with_syntax_validation" />
+      <require id="FAIL_SAFE" value="abort_without_modifying_source_files_if_any_replacement_cannot_be_applied" />
+      <forbid action="use_nested_here_strings" />
+    </constraints>
+  </rule>
+
   <rule id="NO_DUPLICATE_ORIGINS_IN_SINGLE_RESPONSE" severity="CRITICAL">
     <forbid action="emit_2_or_more_diffs_with_identical_original_blocks_in_same_response" />
     <constraint>
@@ -89,6 +131,7 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <forbid value="line_numbers_in_diff" />
     </constraint>
     <rationale>After the first diff is applied, the original block is changed; subsequent diffs referencing the same original will fail.</rationale>
+    <note condition="delivery_mode == 'code_mutation.ps1'">Instead of diffs, a self-contained PS script is generated according to PS_SCRIPT_GENERATION rules. The NO_DUPLICATE_ORIGINS constraint does not apply in script mode.</note>
   </rule>
 
   <rule id="UPDATE_WIP">

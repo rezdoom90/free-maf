@@ -315,15 +315,24 @@ class FileParserApp:
                         troughcolor='#1E1E1E',
                         arrowcolor=FG_LIGHT)
 
+        # Console frame background
         self.root.configure(bg=BG_DARK)
+
+    def _style_console_widgets(self):
+        """Apply dark theme to console frame widgets after they are created."""
+        # console_frame and its children are styled via ttk, but tk.Text needs direct config.
+        # The tk.Text widget is already configured with dark colors at creation time.
+        # This method exists for any post-creation adjustments if needed.
+        pass
 
     def __init__(self, root):
         self._insert_row_index = 0   # reset on every populate
         self.root = root
         self.root.title("File Parser for Multi-Agent")
-        self.root.geometry("900x700")
+        self.root.geometry("1300x700")
+        self.root.minsize(900, 700)
         self._apply_dark_theme()
-        self.root.resizable(False, False)
+        self.root.resizable(True, True)
 
         self.check_states = {}
         self.locked_items = set()
@@ -399,6 +408,52 @@ class FileParserApp:
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
 
         self.project_root = get_project_root()
+
+        # --- Console Frame (PowerShell) ---
+        console_frame = ttk.Frame(paned, width=350)
+        paned.add(console_frame, weight=0)
+
+        ttk.Label(console_frame, text="PowerShell Console").pack(anchor=tk.W, padx=5, pady=(10, 5))
+
+        apply_btn = ttk.Button(console_frame, text="Apply Script", width=20,
+                               command=self._on_apply_script)
+        apply_btn.pack(pady=2, padx=5, fill=tk.X)
+
+        console_text_frame = ttk.Frame(console_frame)
+        console_text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        self.console_text = tk.Text(console_text_frame, wrap=tk.WORD, state=tk.NORMAL,
+                                    bg="#1E1E1E", fg="#DCDCDC", insertbackground="#DCDCDC",
+                                    selectbackground="#4A4A4A", font=("Consolas", 9))
+        console_scrollbar = ttk.Scrollbar(console_text_frame, orient=tk.VERTICAL,
+                                          command=self.console_text.yview)
+        self.console_text.configure(yscrollcommand=console_scrollbar.set)
+
+        self.console_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        console_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Configure console text tags
+        self.console_text.tag_configure("stdout", foreground="#DCDCDC")
+        self.console_text.tag_configure("stderr", foreground="#FF6B6B")
+
+        # Insert initial PS prompt and set marks
+        self.console_text.insert(tk.END, "PS>")
+        prompt_start = self.console_text.index("end-1c linestart")
+        self.console_text.mark_set("ps_prompt", prompt_start)
+        self.console_text.mark_gravity("ps_prompt", tk.LEFT)
+        # read-only boundary: everything before this mark is protected (PS> itself)
+        boundary_pos = self.console_text.index(f"{prompt_start} + 3c")
+        self.console_text.mark_set("readonly_boundary", boundary_pos)
+        self.console_text.mark_gravity("readonly_boundary", tk.LEFT)
+
+        # Track current working directory for manual commands (reset by Apply Script)
+        self._console_cwd = str(self.project_root)
+
+        # Bind Enter key and protection keys in console
+        self.console_text.bind("<Return>", self._on_console_enter)
+        self.console_text.bind("<BackSpace>", self._on_console_key_protect)
+        self.console_text.bind("<Delete>", self._on_console_key_protect)
+        self.console_text.bind("<Key>", self._on_console_key_protect)
         self.populate_tree()
         self._start_polling()
 
@@ -1000,6 +1055,196 @@ class FileParserApp:
         finally:
             self.root.config(cursor="")
             self.root.update_idletasks()
+
+    def _on_apply_script(self):
+        """Read clipboard, save as code_mutation.ps1, execute with async poll."""
+        import pyperclip
+        script_content = pyperclip.paste()
+
+        # Append to existing log with separator (user preference: do not clear console)
+        self.console_text.insert(tk.END, "\n" + "─" * 50 + "\nRunning code_mutation.ps1...\n", "stdout")
+        self.console_text.see(tk.END)
+        self.root.update_idletasks()
+
+        # Reset manual console cwd to project root for script execution
+        self._console_cwd = str(self.project_root)
+
+        # Save script to file
+        script_path = self.project_root / "code_mutation.ps1"
+        try:
+            with open(script_path, 'w', encoding='utf-8-sig') as f:
+                f.write(script_content)
+        except Exception as e:
+            self.console_text.insert(tk.END, f"[Error] Failed to write script: {e}\n", "stderr")
+            self.console_text.see(tk.END)
+            return
+
+        # Execute with async poll as required by PLAN.md step 3.2
+        try:
+            encoding = 'cp866' if sys.platform == 'win32' else 'utf-8'
+            process = subprocess.Popen(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-File", ".\\code_mutation.ps1"],
+                cwd=str(self.project_root),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding=encoding,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+            )
+        except Exception as e:
+            self.console_text.insert(tk.END, f"[Error] Failed to start PowerShell: {e}\n", "stderr")
+            self.console_text.see(tk.END)
+            return
+
+        self._process = process
+        self._read_process_output()
+
+    def _read_process_output(self):
+        """Poll process pipes and append to console_text asynchronously."""
+        process = self._process
+        if process is None:
+            return
+        while True:
+            line = process.stdout.readline()
+            if line:
+                self.console_text.insert(tk.END, line, "stdout")
+                self.console_text.see(tk.END)
+            else:
+                break
+        while True:
+            line = process.stderr.readline()
+            if line:
+                self.console_text.insert(tk.END, line, "stderr")
+                self.console_text.see(tk.END)
+            else:
+                break
+        exit_code = process.poll()
+        if exit_code is not None:
+            if exit_code == 0:
+                self.console_text.insert(tk.END, f"\n[Script completed with exit code {exit_code}]\n", "stdout")
+            else:
+                self.console_text.insert(tk.END, f"\n[Script failed with exit code {exit_code}]\n", "stderr")
+            self.console_text.insert(tk.END, "PS>")
+            prompt_start = self.console_text.index("end-1c linestart")
+            self.console_text.mark_set("ps_prompt", prompt_start)
+            self.console_text.mark_gravity("ps_prompt", tk.LEFT)
+            boundary_pos = self.console_text.index(f"{prompt_start} + 3c")
+            self.console_text.mark_set("readonly_boundary", boundary_pos)
+            self.console_text.mark_gravity("readonly_boundary", tk.LEFT)
+            self.console_text.see(tk.END)
+            self._process = None
+        else:
+            self.root.after(100, self._read_process_output)
+
+    def _on_console_enter(self, event):
+        """Execute the command typed after the last PS> prompt asynchronously."""
+        # Extract command: from after "PS>" (3 chars) to end-1c
+        try:
+            cmd_start = self.console_text.index("ps_prompt + 3c")
+            cmd_end = self.console_text.index("end-1c")
+            cmd = self.console_text.get(cmd_start, cmd_end)
+        except tk.TclError:
+            cmd = ""
+        cmd = cmd.strip()
+        if not cmd:
+            return "break"
+
+        # Move to a new line for output — no command echo (it's already visible in the input line)
+        self.console_text.insert(tk.END, "\n")
+        self.console_text.see(tk.END)
+
+        # Capture current cwd for the thread
+        current_cwd = self._console_cwd
+
+        import threading
+        def run_command():
+            try:
+                kwargs = dict(
+                    cwd=current_cwd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+                )
+                if sys.platform == 'win32':
+                    kwargs['encoding'] = 'cp866'
+                process = subprocess.Popen(["powershell", "-Command", cmd], **kwargs)
+                stdout, stderr = process.communicate()
+                # If it was a cd command, update the working directory for subsequent commands
+                cmd_lower = cmd.strip().lower()
+                if cmd_lower.startswith('cd ') or cmd_lower == 'cd':
+                    parts = cmd.strip().split(maxsplit=1)
+                    if len(parts) > 1:
+                        new_dir = parts[1].strip().strip('"').strip("'")
+                    else:
+                        new_dir = str(self.project_root)
+                    if not Path(new_dir).is_absolute():
+                        new_dir = str(Path(current_cwd) / new_dir)
+                    new_dir = str(Path(new_dir).resolve())
+                    if Path(new_dir).is_dir():
+                        new_cwd = new_dir
+                    else:
+                        new_cwd = current_cwd
+                        stderr = (stderr or '') + f"Set-Location : Cannot find path '{new_dir}'\n"
+                else:
+                    new_cwd = current_cwd
+            except Exception as e:
+                stdout = ""
+                stderr = str(e)
+                new_cwd = current_cwd
+            self.root.after(0, lambda: self._finish_console_command(stdout, stderr, new_cwd))
+
+        threading.Thread(target=run_command, daemon=True).start()
+        return "break"
+
+    def _on_console_key_protect(self, event):
+        """Prevent deletion/modification of the PS> prompt and read-only history."""
+        # Allowed keys: regular input, arrows, clipboard, etc.
+        # We block BackSpace/Delete if they would affect the protected area.
+        if event.keysym in ('BackSpace', 'Delete'):
+            try:
+                sel_start = self.console_text.index(tk.SEL_FIRST)
+                sel_end = self.console_text.index(tk.SEL_LAST)
+            except tk.TclError:
+                sel_start = self.console_text.index(tk.INSERT)
+                sel_end = sel_start
+
+            boundary = self.console_text.index("readonly_boundary")
+            # If the selection or insertion point touches the read-only area, block
+            if self.console_text.compare(sel_start, "<", boundary) or \
+                    self.console_text.compare(sel_end, "<=", boundary):
+                # But allow delete if the whole selection is after boundary
+                if event.keysym == 'Delete' and self.console_text.compare(sel_start, ">=", boundary):
+                    pass  # allow
+                else:
+                    return "break"
+        elif event.char and len(event.char) > 0:
+            # Check insertion point
+            insert = self.console_text.index(tk.INSERT)
+            boundary = self.console_text.index("readonly_boundary")
+            if self.console_text.compare(insert, "<", boundary):
+                # Move cursor to the end and insert there
+                self.console_text.mark_set(tk.INSERT, "end-1c")
+        # Allow the event
+
+    def _finish_console_command(self, stdout, stderr, new_cwd):
+        """Called in main thread after async command completes."""
+        if stdout:
+            self.console_text.insert(tk.END, stdout, "stdout")
+        if stderr:
+            self.console_text.insert(tk.END, stderr, "stderr")
+        # Update current working directory (cd is tracked, reset only by Apply Script)
+        self._console_cwd = new_cwd
+        # Append fresh prompt
+        self.console_text.insert(tk.END, "PS>")
+        prompt_start = self.console_text.index("end-1c linestart")
+        self.console_text.mark_set("ps_prompt", prompt_start)
+        self.console_text.mark_gravity("ps_prompt", tk.LEFT)
+        # Update read-only boundary: protect PS> itself
+        boundary_pos = self.console_text.index(f"{prompt_start} + 3c")
+        self.console_text.mark_set("readonly_boundary", boundary_pos)
+        self.console_text.mark_gravity("readonly_boundary", tk.LEFT)
+        self.console_text.see(tk.END)
 
 def main():
     root = tk.Tk()
