@@ -415,9 +415,17 @@ class FileParserApp:
 
         ttk.Label(console_frame, text="PowerShell Console").pack(anchor=tk.W, padx=5, pady=(10, 5))
 
-        apply_btn = ttk.Button(console_frame, text="Apply Script", width=20,
+        btn_row = ttk.Frame(console_frame)
+        btn_row.pack(pady=2, padx=5, fill=tk.X)
+
+        apply_btn = ttk.Button(btn_row, text="Apply Script", width=20,
                                command=self._on_apply_script)
-        apply_btn.pack(pady=2, padx=5, fill=tk.X)
+        apply_btn.pack(side=tk.LEFT, padx=(0, 2))
+
+        copy_console_btn = ttk.Button(btn_row, text="📋", width=3,
+                                      command=self._on_copy_console_output)
+        copy_console_btn.pack(side=tk.LEFT)
+        ToolTip(copy_console_btn, "Copy output of last console command to clipboard")
 
         console_text_frame = ttk.Frame(console_frame)
         console_text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -454,6 +462,8 @@ class FileParserApp:
         self.console_text.bind("<BackSpace>", self._on_console_key_protect)
         self.console_text.bind("<Delete>", self._on_console_key_protect)
         self.console_text.bind("<Key>", self._on_console_key_protect)
+        self.console_text.bind("<<Cut>>", lambda e: "break")
+        self.console_text.bind("<Control-x>", lambda e: "break")
         self.populate_tree()
         self._start_polling()
 
@@ -1055,6 +1065,35 @@ class FileParserApp:
         finally:
             self.root.config(cursor="")
             self.root.update_idletasks()
+
+    def _on_copy_console_output(self):
+        """Copy output of the last command (text between the last two PS> prompts)."""
+        import pyperclip
+        full_text = self.console_text.get("1.0", tk.END)
+        last_ps = full_text.rfind("PS>")
+        if last_ps == -1:
+            output = full_text.rstrip("\n")
+        else:
+            # Find the previous PS> (the command that produced the output)
+            prev_ps = full_text.rfind("PS>", 0, last_ps)
+            if prev_ps == -1:
+                # Only one PS> in console — copy everything after its line
+                nl = full_text.find("\n", last_ps)
+                output = full_text[nl + 1:last_ps].rstrip("\n") if nl != -1 else ""
+            else:
+                # Output is everything after the previous PS> line, before the last PS>
+                nl = full_text.find("\n", prev_ps)
+                if nl != -1 and nl < last_ps:
+                    output = full_text[nl + 1:last_ps].rstrip("\n")
+                else:
+                    output = ""
+        if output:
+            pyperclip.copy(output)
+            self.status_label.config(text="Console output copied to clipboard")
+            self.root.after(3000, lambda: self.status_label.config(text="Ready"))
+        else:
+            self.status_label.config(text="No console output to copy")
+            self.root.after(3000, lambda: self.status_label.config(text="Ready"))
 
     def _on_apply_script(self):
         """Read clipboard, save as code_mutation.ps1, execute with async poll."""

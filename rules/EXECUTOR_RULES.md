@@ -118,6 +118,24 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <require id="FULL_REWRITE_SAFETY" value="when_rewriting_entire_file_use_reference_content_with_syntax_validation" />
       <require id="FAIL_SAFE" value="abort_without_modifying_source_files_if_any_replacement_cannot_be_applied" />
       <forbid action="use_nested_here_strings" />
+
+      <!-- v4.12: 7 PowerShell code-mutation best practices -->
+      <require id="FULL_REWRITE_THRESHOLD" value="при_изменении_более_30%_файла_или_более_5_правок_выполнять_полную_перезапись_вместо_точечных_замен" />
+      <require id="REGEX_PATTERN_PREFERENCE" value="для_замен_использовать_символьные_regex-паттерны_а_не_точное_копирование_блоков" />
+      <require id="LINE_DELETION_REGEX" value="удаление_целых_строк_через_(?m)^\s*...\s*\r?\n" />
+      <require id="MARKER_BASED_REPLACEMENT" value="при_наличии_уникальной_строки-маркера_заменять_всё_от_маркера_до_уникального_конца" />
+      <require id="FUNCTION_TO_EOF_REPLACEMENT" value="если_функция_последняя_в_файле_заменять_от_сигнатуры_до_EOF_через_(?ms)^\s*Func\(\)\s*\{.*$" />
+      <require id="WRITEALLTEXT_METHOD" value="использовать_строго_[System.IO.File]::WriteAllText_с_[System.Text.UTF8Encoding]::new($true)" />
+      <require id="STAGE_BACKUPS" value="перед_каждой_стадией_создавать_бэкап_с_суффиксами_.s1bak_.s2bak_и_т.д." />
+
+      <!-- v4.12: 7 PowerShell code-mutation anti-patterns -->
+      <forbid action="EXACT_MATCH_TABS" value="запрещена_exact-match_замена_многострочных_блоков_с_табуляцией" />
+      <forbid action="CONCAT_IN_REPLACE" value="запрещена_конкатенация_переменных_внутри_-replace" />
+      <forbid action="QUOTE_ESCAPE_REGEX" value="запрещено_экранирование_через_\Q...\E;_только_[regex]::Escape()" />
+      <forbid action="LITERAL_CRLF_IN_HERESTRING" value="запрещён_литерал_CRLF_в_теле_here-string;_использовать_строку_в_кавычках_или_[Environment]::NewLine" />
+      <forbid action="CHAINED_REPLACE_ONCE" value="запрещены_множественные_последовательные_Replace-Once_в_одном_файле;_объединять_в_один_regex_или_перезаписывать_файл" />
+      <forbid action="REGEX_ON_NESTED_BRACES" value="запрещены_точечные_regex-правки_вложенных_функций;_только_ручная_правка_или_полная_перезапись_функции" />
+      <forbid action="HARDCODED_EOL" value="запрещена_привязка_к_конкретному_EOL;_всегда_использовать_\r?\n_в_regex_и_WriteAllText_для_консистентных_\r\n" />
     </constraints>
   </rule>
 
