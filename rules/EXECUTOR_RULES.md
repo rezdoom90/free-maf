@@ -119,14 +119,16 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <require id="FAIL_SAFE" value="abort_without_modifying_source_files_if_any_replacement_cannot_be_applied" />
       <forbid action="use_nested_here_strings" />
 
-      <!-- v4.12: 7 PowerShell code-mutation best practices -->
+      <!-- v4.13: 9 PowerShell code-mutation best practices -->
       <require id="FULL_REWRITE_THRESHOLD" value="при_изменении_более_30%_файла_или_более_5_правок_выполнять_полную_перезапись_вместо_точечных_замен" />
       <require id="REGEX_PATTERN_PREFERENCE" value="для_замен_использовать_символьные_regex-паттерны_а_не_точное_копирование_блоков" />
       <require id="LINE_DELETION_REGEX" value="удаление_целых_строк_через_(?m)^\s*...\s*\r?\n" />
       <require id="MARKER_BASED_REPLACEMENT" value="при_наличии_уникальной_строки-маркера_заменять_всё_от_маркера_до_уникального_конца" />
       <require id="FUNCTION_TO_EOF_REPLACEMENT" value="если_функция_последняя_в_файле_заменять_от_сигнатуры_до_EOF_через_(?ms)^\s*Func\(\)\s*\{.*$" />
       <require id="WRITEALLTEXT_METHOD" value="использовать_строго_[System.IO.File]::WriteAllText_с_[System.Text.UTF8Encoding]::new($true)" />
-      <require id="STAGE_BACKUPS" value="перед_каждой_стадией_создавать_бэкап_с_суффиксами_.s1bak_.s2bak_и_т.д." />
+      <require id="STAGE_BACKUPS" value="перед_каждой_стадией_создавать_бэкап_в_agent/cache/_с_суффиксами_.s1bak_.s2bak_и_ротацией_(≤3_последних_копии_каждого_файла)" />
+      <require id="JSON_REPORT_FORMAT" value="выводить_итоговый_результат_в_виде_JSON-объекта_{&quot;status&quot;:&quot;ok&quot;/&quot;fail&quot;,&quot;modified&quot;:[...],&quot;skipped&quot;:[...],&quot;error&quot;:&quot;...&quot;}" />
+      <require id="WHITESPACE_AGNOSTIC_PATTERNS" value="в_regex-паттернах_заменять_жёсткие_пробелы/табуляции_на_\s*_для_независимости_от_стиля_форматирования" />
 
       <!-- v4.12: 7 PowerShell code-mutation anti-patterns -->
       <forbid action="EXACT_MATCH_TABS" value="запрещена_exact-match_замена_многострочных_блоков_с_табуляцией" />
