@@ -113,6 +113,62 @@ All rules in this file are unconditional. The model MUST follow them regardless 
     </rationale>
   </directive>
 
+  <directive id="NO_NESTED_FENCED_BLOCKS">
+    <severity value="CRITICAL" />
+    <scope value="ALL_AGENT_OUTPUTS" />
+    <pre_check>
+      <before action="emit_any_output">
+        <action value="scan_entire_response_for_nested_fenced_block_delimiters" />
+        <on_detect action="rewrite_output_to_eliminate_nesting" />
+      </before>
+    </pre_check>
+    <require action="after_generating_response">
+      <check>Содержит ли мой ответ вложенные блоки из тройных обратных кавычек? Если да — исправить до отправки.</check>
+    </require>
+    <constraint>
+      <forbid action="place_any_fenced_block_inside_another_fenced_block" />
+      <forbid action="use_fenced_block_delimiters_inside_an_existing_fenced_block" />
+      <note>Fenced block delimiters = три или более обратных кавычек (``` или больше), открывающих или закрывающих ограждённый блок любой метки (code, markdown, json, xml, PLAN, RESULT, и любых других).</note>
+      <allow alternative="HTML_entity_escaping_for_XML_JSON_or_code_snippets_inside_fenced_blocks" />
+      <allow alternative="4_space_indentation_for_plain_code_examples_inside_fenced_blocks" />
+    </constraint>
+    <examples>
+      <violation>
+        <description>Один блок markdown, а внутри json.</description>
+        <bad>&#96;&#96;&#96;markdown
+Некоторый текст
+&#96;&#96;&#96;json
+{"key": "value"}
+&#96;&#96;&#96;
+&#96;&#96;&#96;</bad>
+      </violation>
+      <correct>
+        <description>Первый блок закрыт, текст вне блоков, второй блок открыт независимо.</description>
+        <good>&#96;&#96;&#96;markdown
+Некоторый текст
+&#96;&#96;&#96;
+
+&#96;&#96;&#96;json
+{"key": "value"}
+&#96;&#96;&#96;</good>
+</correct>
+<correct>
+<description>Внутри markdown использовать HTML-entities.</description>
+<good>&#96;&#96;&#96;markdown
+Некоторый текст с &amp;lt;code&amp;gt;фрагментом&amp;lt;/code&amp;gt;
+&#96;&#96;&#96;</good>
+</correct>
+<note>Множественные последовательные независимые fenced-блоки разрешены, если между ними есть хотя бы одна строка текста вне ограждений.</note>
+</examples>
+<rationale>
+Fenced block delimiters (```) always close the outermost fenced block regardless of label.
+Nesting breaks formatting and causes content to leak across ALL output types
+(code, markdown, json, xml, PLAN.md, RESULT.md, and any other fenced artifact).
+This rule applies to EVERY agent response without exception.
+Use HTML‑entity escaping (&amp;lt; &amp;gt;) or 4‑space indentation for examples.
+</rationale>
+</directive>
+
   <directive id="ROOT_CAUSE_ONLY">
     <on_error_handling>
       <action seq="[state_root_cause_explicitly, propose_fix_that_addresses_root_cause]" />
@@ -344,31 +400,6 @@ blocks unless tightly constrained.
       <enforce value="MUST_BE_WRAPPED_IN_TRIPLE_BACKTICKS_MARKDOWN_BLOCK" />
       <forbid value="plaintext_generation_outside_block" />
     </for_files>
-  </rule>
-
-    <rule id="NO_NESTED_FENCED_BLOCKS">
-    <severity value="CRITICAL" />
-    <scope value="ALL_AGENT_OUTPUTS" />
-    <pre_check>
-      <before action="emit_any_output">
-        <action value="scan_entire_response_for_nested_fenced_block_delimiters" />
-        <on_detect action="rewrite_output_to_eliminate_nesting" />
-      </before>
-    </pre_check>
-    <constraint>
-      <forbid action="place_any_fenced_block_inside_another_fenced_block" />
-      <forbid action="use_fenced_block_delimiters_inside_an_existing_fenced_block" />
-      <note>Fenced block delimiters = три или более обратных кавычек (``` или больше), открывающих или закрывающих ограждённый блок любой метки (code, markdown, json, xml, PLAN, RESULT, и любых других).</note>
-      <allow alternative="HTML_entity_escaping_for_XML_JSON_or_code_snippets_inside_fenced_blocks" />
-      <allow alternative="4_space_indentation_for_plain_code_examples_inside_fenced_blocks" />
-    </constraint>
-    <rationale>
-      Fenced block delimiters (```) always close the outermost fenced block regardless of label.
-      Nesting breaks formatting and causes content to leak across ALL output types
-      (code, markdown, json, xml, PLAN.md, RESULT.md, and any other fenced artifact).
-      This rule applies to EVERY agent response without exception.
-      Use HTML‑entity escaping (&amp;lt; &amp;gt;) or 4‑space indentation for examples.
-    </rationale>
   </rule>
 
   <schema id="PROJECT_STATE.md">

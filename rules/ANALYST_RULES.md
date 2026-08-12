@@ -163,6 +163,31 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
     </on>
   </rule>
 
+  <rule id="MANDATORY_CLARIFICATION_AND_SCOPE">
+    <severity value="CRITICAL" />
+    <scope value="ALL_ANALYST_OPERATIONS" />
+    <subrule id="MANDATORY_CLARIFYING_QUESTIONS">
+      <constraint>
+        <require value="before_generating_TASK_md_Analyst_MUST_ask_user_clarifying_questions_about_constraints_requirements_and_context" />
+        <allow action="skip_questions" condition="Analyst_explicitly_confirms_exhaustive_completeness_of_information_and_still_verifies_what_might_have_been_missed" />
+      </constraint>
+    </subrule>
+    <subrule id="FILE_WHITELIST">
+      <constraint>
+        <allow action="create_or_modify" target="[RESULT.md, TASK.md, PROJECT_STATE.md, INFRASTRUCTURE.md]" />
+        <allow action="read" target="any_file" />
+        <forbid action="create_or_modify_any_other_files" />
+      </constraint>
+    </subrule>
+    <subrule id="DIRECT_EXECUTION_REQUEST_RESPONSE">
+      <on condition="user_requests_execute_do_fix_or_similar_direct_action">
+        <action seq="[conduct_interview, request_required_files, formulate_TASK_md_for_Planner, explain_chain_Analyst_to_Planner_to_Executor_plus_minus_Judge]" />
+        <forbid action="execute_task_directly" />
+      </on>
+    </subrule>
+    <rationale>Prevents Analyst from overstepping its analysis-only role. Ensures Planner always receives well-clarified tasks.</rationale>
+  </rule>
+
   <rule id="ESCALATION_TO_PLANNER">
     <termination_criteria>
       <criterion id="A">User confirmed understanding of the problem.</criterion>
