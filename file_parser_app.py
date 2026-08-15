@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 File Parser GUI Application for Multi-Agent Framework
 Stage 1: Foundation – Project Scanner & Shell
@@ -124,7 +124,7 @@ def generate_map_python(project_root: Path):
                 connector = '\\-- ' if is_last_item else '+-- '
                 if entry.is_dir():
                     lines.append(f"|   {connector}{entry.name}")
-                    build_tree_lines(entry, '    ' if is_last_item else '|   ', is_last_item, is_root=False)
+                    build_tree_lines(entry, '|   ' + ('    ' if is_last_item else '|   '), is_last_item, is_root=False)
                 else:
                     lines.append(f"|   {connector}{entry.name}")
         else:
@@ -185,9 +185,20 @@ class ToolTip:
         self.tip_window = tw = tk.Toplevel(self.widget)
         tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
+        # Use app-level tooltip font if available, fallback to default
+        try:
+            app = self.widget.winfo_toplevel().children.get('!fileparserapp')
+            if app is None:
+                for child in self.widget.winfo_toplevel().winfo_children():
+                    if isinstance(child, tk.Tk):
+                        app = child
+                        break
+            tooltip_font = getattr(app, '_tooltip_font', ("tahoma", 8, "normal"))
+        except Exception:
+            tooltip_font = ("tahoma", 8, "normal")
         label = tk.Label(tw, text=self.text, justify=tk.LEFT,
                          background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                         font=("tahoma", "8", "normal"))
+                         font=tooltip_font)
         label.pack()
 
     def _hide(self):
@@ -200,6 +211,8 @@ class ToolTip:
 # ----------------------------------------------------------------------
 
 class FileParserApp:
+    _MAP_EXCLUDED_BUTTONS = {"get_files_only", "kickoff_new", "web_analyst"}
+
     REQUIRED_FILES = {
         "kickoff_new": [
             "agent/rules/GENERAL_RULES.md",
@@ -344,6 +357,8 @@ class FileParserApp:
         self.tree_visible = True
         self._poll_interval_ms = 3000
         self._opening_file = False
+        self.font_scale_index = 1
+        self._tooltip_font = ("tahoma", 8, "normal")
 
         paned = ttk.PanedWindow(root, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True)
@@ -372,6 +387,8 @@ class FileParserApp:
         btn_frame.pack(fill=tk.X, padx=5, pady=5)
         ttk.Button(btn_frame, text="Clear", command=self.on_clear).pack(side=tk.LEFT, padx=2)
         ttk.Button(btn_frame, text="All", command=self.on_select_all).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="A−", width=3, command=lambda: self._change_font_scale(-1)).pack(side=tk.RIGHT, padx=1)
+        ttk.Button(btn_frame, text="A+", width=3, command=lambda: self._change_font_scale(1)).pack(side=tk.RIGHT, padx=1)
 
         right_frame = ttk.Frame(paned, width=400)
         paned.add(right_frame, weight=0)
@@ -643,6 +660,29 @@ class FileParserApp:
     def _reset_opening_flag(self):
         self._opening_file = False
         self.status_label.config(text="Double-click a file to open | Ready")
+
+    def _change_font_scale(self, delta):
+        self.font_scale_index = max(0, min(3, self.font_scale_index + delta))
+        self._apply_font_scale()
+
+    def _apply_font_scale(self):
+        scales = (0.8, 1.0, 1.25, 1.5)
+        scale = scales[self.font_scale_index]
+        tree_font_size = max(6, int(9 * scale))
+        button_font_size = max(6, int(9 * scale))
+        label_font_size = max(6, int(9 * scale))
+        console_font_size = max(6, int(9 * scale))
+        status_font_size = max(6, int(8 * scale))
+        tooltip_font_size = max(6, int(8 * scale))
+
+        style = ttk.Style()
+        style.configure('TButton', font=('TkDefaultFont', button_font_size))
+        style.configure('TLabel', font=('TkDefaultFont', label_font_size))
+        style.configure('Treeview', font=('TkDefaultFont', tree_font_size))
+        style.configure('Treeview.Heading', font=('TkDefaultFont', tree_font_size))
+
+        self.console_text.configure(font=('Consolas', console_font_size))
+        self._tooltip_font = ('tahoma', tooltip_font_size, 'normal')
 
     def _toggle_item(self, iid):
         current = self.check_states.get(iid, False)
@@ -937,8 +977,7 @@ class FileParserApp:
                 print(f"  {c}")
 
             # Phase 2: generate MAP if needed (before existence check — MAP.md will be created)
-            map_needed = ((button_id == "get_files_with_map" or button_id == "kickoff_existing")
-                          and "agent/project/MAP.md" in candidates)
+            map_needed = (button_id not in self._MAP_EXCLUDED_BUTTONS and "agent/project/MAP.md" in candidates)
             if map_needed:
                 try:
                     generate_map(self.project_root)
