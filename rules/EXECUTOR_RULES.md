@@ -1,4 +1,4 @@
-﻿<directive id="CONTEXT_AND_ROLE_INITIALIZATION">
+<directive id="CONTEXT_AND_ROLE_INITIALIZATION">
   <rule id="MANDATORY_FILE_CHECK">
     <on_missing_file>
       <action value="request_missing_files_directly_from_user" />
@@ -108,7 +108,8 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
     <constraints>
       <require id="PROJECT_ROOT_CWD" value="assume_script_is_executed_from_project_root_with_cwd_=_project_root;_all_file_paths_must_be_relative_to_project_root_or_use_$PSScriptRoot" />
       <require id="IDEMPOTENCY" value="script_must_be_safely_re_runnable_without_side_effects" />
-      <require id="UTF8_BOM" value="save_as_UTF8_with_BOM" />
+      <require id="PS_SCRIPT_UTF8_BOM" value="code_mutation.ps1_сохранять_как_UTF-8_с_BOM" />
+      <require id="TARGET_FILES_UTF8_NO_BOM" value="целевые_.java_и_.md_сохранять_как_UTF-8_без_BOM_через_[System.Text.UTF8Encoding]::new($false)" />
       <require id="FRAGMENT_CHECK" value="verify_target_fragment_exists_before_replacement">
         <on_fail action="emit_warning_not_error_and_skip_that_replacement" />
       </require>
@@ -125,12 +126,16 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <require id="LINE_DELETION_REGEX" value="удаление_целых_строк_через_(?m)^\s*...\s*\r?\n" />
       <require id="MARKER_BASED_REPLACEMENT" value="при_наличии_уникальной_строки-маркера_заменять_всё_от_маркера_до_уникального_конца" />
       <require id="FUNCTION_TO_EOF_REPLACEMENT" value="если_функция_последняя_в_файле_заменять_от_сигнатуры_до_EOF_через_(?ms)^\s*Func\(\)\s*\{.*$" />
-      <require id="WRITEALLTEXT_METHOD" value="использовать_строго_[System.IO.File]::WriteAllText_с_[System.Text.UTF8Encoding]::new($true)" />
+      <require id="WRITEALLTEXT_METHOD" value="применяется_только_к_сохранению_самого_PS-скрипта" />
+      <require id="TARGET_FILES_WRITEALLLINES" value="для_целевых_файлов_использовать_[System.IO.File]::WriteAllLines(path,_lines,_[System.Text.UTF8Encoding]::new($false))" />
+      <require id="FULL_REWRITE_VIA_WRITEALLLINES" value="полная_перезапись_или_создание_Java,_Markdown_и_state-файлов_выполняется_только_массивом_строк_и_[System.IO.File]::WriteAllLines" />
+      <forbid action="HERESTRING_FULL_FILE_REWRITE" value="запрещена_полная_перезапись_исходных_и_state-файлов_через_here-string_+_WriteAllText" />
+      <require id="EXACT_BLANK_LINE_CONTRACT" value="Java:_без_пустых_строк_после_package;_без_пустых_строк_между_импортами;_без_пустых_строк_внутри_методов;_пустые_строки_допустимы_только_между_методами_или_логическими_блоками_и_перед_классом_или_record;_Markdown:_только_одиночные_пустые_строки_между_заголовками,_абзацами_и_пунктами;_множественные_пустые_строки_запрещены" />
       <require id="STAGE_BACKUPS" value="перед_каждой_стадией_создавать_бэкап_в_agent/cache/_с_суффиксами_.s1bak_.s2bak_и_ротацией_(≤3_последних_копии_каждого_файла)" />
       <require id="JSON_REPORT_FORMAT" value="выводить_итоговый_результат_в_виде_JSON-объекта_{&quot;status&quot;:&quot;ok&quot;/&quot;fail&quot;,&quot;modified&quot;:[...],&quot;skipped&quot;:[...],&quot;error&quot;:&quot;...&quot;}" />
       <require id="WHITESPACE_AGNOSTIC_PATTERNS" value="в_regex-паттернах_заменять_жёсткие_пробелы/табуляции_на_\s*_для_независимости_от_стиля_форматирования" />
 
-      <!-- v4.12: 7 PowerShell code-mutation anti-patterns -->
+      <!-- v4.12: 10 PowerShell code-mutation anti-patterns -->
       <forbid action="EXACT_MATCH_TABS" value="запрещена_exact-match_замена_многострочных_блоков_с_табуляцией" />
       <forbid action="CONCAT_IN_REPLACE" value="запрещена_конкатенация_переменных_внутри_-replace" />
       <forbid action="QUOTE_ESCAPE_REGEX" value="запрещено_экранирование_через_\Q...\E;_только_[regex]::Escape()" />
@@ -138,6 +143,9 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <forbid action="CHAINED_REPLACE_ONCE" value="запрещены_множественные_последовательные_Replace-Once_в_одном_файле;_объединять_в_один_regex_или_перезаписывать_файл" />
       <forbid action="REGEX_ON_NESTED_BRACES" value="запрещены_точечные_regex-правки_вложенных_функций;_только_ручная_правка_или_полная_перезапись_функции" />
       <forbid action="HARDCODED_EOL" value="запрещена_привязка_к_конкретному_EOL;_всегда_использовать_\r?\n_в_regex_и_WriteAllText_для_консистентных_\r\n" />
+      <forbid action="HERESTRING_FULL_FILE_REWRITE" value="запрещена_полная_перезапись_исходников_через_here-string_+_WriteAllText" />
+      <forbid action="UTF8_BOM_FOR_JAVA_OR_MD_TARGETS" value="запрещено_добавлять_UTF-8_BOM_в_целевые_Java_или_Markdown-файлы" />
+      <forbid action="HEURISTIC_BLANK_LINE_COLLAPSE" value="запрещена_эвристическая_нормализация_пустых_строк_без_эталонного_массива_строк" />
     </constraints>
   </rule>
 
@@ -284,3 +292,4 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
     </on>
   </rule>
 </role>
+
