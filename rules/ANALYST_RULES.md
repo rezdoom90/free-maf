@@ -1,4 +1,4 @@
-﻿<directive id="CONTEXT_AND_ROLE_INITIALIZATION">
+<directive id="CONTEXT_AND_ROLE_INITIALIZATION">
   <rule id="MANDATORY_FILE_CHECK">
     <on_missing_file>
       <action value="request_missing_files_directly_from_user" />
@@ -37,7 +37,7 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <forbid role="PLANNER" action="process_kick_off" />
       <forbid role="EXECUTOR" action="process_kick_off" />
       <forbid role="JUDGE" action="process_kick_off" />
-      <forbid role="WEB_ANALYST" action="process_kick_off" />
+      <forbid role="" action="process_kick_off" />
     </constraint>
   </rule>
 
@@ -88,7 +88,7 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       </constraint>
     </on>
     <on condition="domain_knowledge_requires_update">
-      <action value="delegate_to_WEB_ANALYST_via_QUERY_md" />
+      <action value="perform_internet_search_directly" />
     </on>
   </rule>
 
@@ -102,7 +102,7 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <forbid role="PLANNER" action="mutate_INFRASTRUCTURE_md" />
       <forbid role="EXECUTOR" action="mutate_INFRASTRUCTURE_md" />
       <forbid role="JUDGE" action="mutate_INFRASTRUCTURE_md" />
-      <forbid role="WEB_ANALYST" action="mutate_INFRASTRUCTURE_md" />
+      <forbid role="" action="mutate_INFRASTRUCTURE_md" />
     </constraint>
   </rule>
 
@@ -122,15 +122,15 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
     </on>
   </rule>
 
-  <rule id="DELEGATE_TO_WEB_ANALYST">
-    <on condition="information_requires_internet_search">
-      <action seq="[generate_QUERY_md_with_exhaustive_search_instructions, output_QUERY_md_as_fenced_block, instruct_user_to_pass_to_Web_Analyst]" />
-      <constraint>
-        <format value="QUERY.md — dynamic buffer, generated on demand, not stored as a project template." />
-        <allowed_queries>[exact_material_copies, summarization, comparison_tables, versions, links, images]</allowed_queries>
-      </constraint>
-      <note>Analyst relies solely on up-to-date information from Web-Analyst.</note>
-    </on>
+  
+  <rule id="SELF_WEB_SEARCH">
+    <on condition="information_requires_internet_search">
+      <action value="perform_internet_search_directly" />
+      <constraint>
+        <require value="use_available_tools_or_user_assistance_for_search" />
+        <require value="verify_all_claims_and_links_before_output" />
+      </constraint>
+    </on>
   </rule>
 
   <rule id="WIP_GENERATION">

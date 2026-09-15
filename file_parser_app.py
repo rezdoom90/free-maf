@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 File Parser GUI Application for Multi-Agent Framework
 Stage 1: Foundation – Project Scanner & Shell
@@ -211,7 +211,7 @@ class ToolTip:
 # ----------------------------------------------------------------------
 
 class FileParserApp:
-    _MAP_EXCLUDED_BUTTONS = {"get_files_only", "kickoff_new", "web_analyst"}
+    _MAP_EXCLUDED_BUTTONS = {"get_files_only", "kickoff_new", }
 
     REQUIRED_FILES = {
         "kickoff_new": [
@@ -229,11 +229,6 @@ class FileParserApp:
             "agent/project/INFRASTRUCTURE.md",
             "agent/project/PROJECT_STATE.md",
             "agent/project/MAP.md"
-        ],
-        "web_analyst": [
-            "agent/rules/GENERAL_RULES.md",
-            "agent/rules/WEB_ANALYST_RULES.md",
-            "agent/project/QUERY.md"
         ],
         "planner": [
             "agent/rules/GENERAL_RULES.md",
@@ -399,7 +394,6 @@ class FileParserApp:
             ("Kick-off (New)", "kickoff_new"),
             ("Kick-off (Existing)", "kickoff_existing"),
             ("Analyst", "analyst"),
-            ("Web-Analyst", "web_analyst"),
             ("Planner", "planner"),
             ("Executor", "executor"),
             ("Judge Plan", "judge_plan"),
@@ -505,11 +499,6 @@ class FileParserApp:
         if button_id == "analyst":
             lines = ["Required files (PROJECT_STATE.md and INFRASTRUCTURE.md are attached only if they exist):"]
             for f in self.REQUIRED_FILES.get("analyst", []):
-                lines.append(f"• {f}")
-            return "\n".join(lines)
-        if button_id == "web_analyst":
-            lines = ["Required files (QUERY.md is attached by default; if absent, other files are still copied):"]
-            for f in self.REQUIRED_FILES.get("web_analyst", []):
                 lines.append(f"• {f}")
             return "\n".join(lines)
         files = self.REQUIRED_FILES.get(button_id, [])
@@ -1034,7 +1023,7 @@ class FileParserApp:
                                      "\n\nNo content was copied to clipboard.")
                 return
 
-            # Non-critical missing files (PROJECT_STATE.md, INFRASTRUCTURE.md, QUERY.md, MAP.md) are silently skipped.
+            # Non-critical missing files (PROJECT_STATE.md, INFRASTRUCTURE.md, , MAP.md) are silently skipped.
 
             print(f"Прочитано: {files_read_ok}, пропущено: {len(skipped_status)}")
 

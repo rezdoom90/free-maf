@@ -32,7 +32,7 @@ Multi-Agent Framework превращает обычный текстовый ч�
 
 ## 2. Рабочий цикл (Chat Workflow)
 
-Ваше общение с агентом проходит через четыре этапа (от анализа до проверки) с участием вспомогательной роли Web-Analyst.
+Ваше общение с агентом проходит через четыре этапа (от анализа до проверки).
 
 ### Этап 0: Анализ и аудит (Роль: ANALYST)
 *   **Задача:** Прояснить и сформулировать цель, провести аудит проекта или предметной области.
@@ -40,9 +40,6 @@ Multi-Agent Framework превращает обычный текстовый ч�
 *   **Ваше действие:** Нажмите **Analyst** в File Parser GUI — в буфер обмена скопируются `GENERAL_RULES.md`, `ANALYST_RULES.md`, `INFRASTRUCTURE.md`, `PROJECT_STATE.md`, `MAP.md` и выбранные файлы. Вставьте в чат и опишите, что нужно проанализировать или сформулируйте начальную цель.
 *   **Финал этапа:** Аналитик выдаст отчёт `RESULT.md` с готовой формулировкой задачи. Передайте её Планировщику.
 
-### Вспомогательная роль: WEB_ANALYST
-*   **Задача:** Поиск информации в интернете по запросу любого другого агента.
-*   **Как работает:** Если агенту нужны данные из сети, он сгенерирует `QUERY.md`. Нажмите **Web-Analyst** в File Parser GUI, вставьте скопированные файлы и содержимое `QUERY.md` в новый чат. Web-Analyst выполнит поиск, вернёт результат — передайте его запросившему агенту.
 
 ### Этап 1: Планирование (Роль: PLANNER)
 *   **Задача:** Превратить готовую цель в список атомарных шагов.
@@ -75,8 +72,8 @@ Multi-Agent Framework превращает обычный текстовый ч�
 | Модель | Рекомендуемые задачи | Примечания |
 |---|---|---|
 | **DeepSeek Expert (MoE)** | Тяжеловесная работа с кодом, большие объёмы данных/текста, планирование (Planner), исполнение (Executor) | Основная рабочая лошадка фреймворка для сложных задач. |
-| **Gemini Pro** | Лёгкие задачи и приложения, веб-аналитика (Web-Analyst: поиск и верификация ссылок) | Хороший баланс скорости и качества для вспомогательных ролей. |
-| **DeepSeek Instant** | Только веб-аналитика (Web-Analyst: быстрый поиск) | Минимальная задержка, подходит для простых поисковых запросов. |
+| **Gemini Pro** | Лёгкие задачи и приложения, веб-аналитика (поиск и верификация ссылок) | Хороший баланс скорости и качества для вспомогательных ролей. |
+| **DeepSeek Instant** | Только веб-аналитика (быстрый поиск) | Минимальная задержка, подходит для простых поисковых запросов. |
 
 > **Важно:** Если задача не решается после 3 попыток (разных подходов) на текущей модели — переключитесь на более мощную модель. См. правило `MODEL_SWITCH_ESCALATION` в GENERAL_RULES.md.
 
@@ -94,7 +91,6 @@ Multi-Agent Framework превращает обычный текстовый ч�
    - **Kick-off (New)** – `GENERAL_RULES.md` + `ANALYST_RULES.md` (интервью с Аналитиком для нового проекта).
    - **Kick-off (Existing)** – `GENERAL_RULES.md` + `ANALYST_RULES.md` + `MAP.md` (PROJECT_STATE.md и INFRASTRUCTURE.md не включаются — Аналитик создаст их при аудите).
    - **Analyst** – `GENERAL_RULES.md` + `ANALYST_RULES.md` + `MAP.md`. `PROJECT_STATE.md` и `INFRASTRUCTURE.md` прикрепляются только если существуют; при их отсутствии Аналитик считает проект новым для фреймворка.
-   - **Web-Analyst** – `GENERAL_RULES.md` + `WEB_ANALYST_RULES.md` + `QUERY.md`. Если `QUERY.md` отсутствует, копируются только правила. Без `QUERY.md` и без задачи от пользователя Web-Analyst сообщит о необходимости прикрепить запрос.
    - **Planner** – `GENERAL_RULES.md` + `PLANNER_RULES.md` + `MAP.md`. `PROJECT_STATE.md` и `INFRASTRUCTURE.md` прикрепляются только если существуют.
    - **Executor** – `GENERAL_RULES.md` + `EXECUTOR_RULES.md` + `PLAN.md` + `MAP.md`. `PROJECT_STATE.md` и `INFRASTRUCTURE.md` прикрепляются только если существуют.
    - **Judge Plan** – `GENERAL_RULES.md` + `JUDGE_RULES.md` + `PLAN.md` + `MAP.md`. `PROJECT_STATE.md` и `INFRASTRUCTURE.md` прикрепляются только если существуют.
@@ -126,7 +122,7 @@ Multi-Agent Framework превращает обычный текстовый ч�
 3. Запустите `FileParserGui.exe` из папки `agent/`.
 
 ### Структура директорий
-- `agent/rules/` — правила ролей (`GENERAL_RULES.md`, `PLANNER_RULES.md`, `EXECUTOR_RULES.md`, `JUDGE_RULES.md`, `ANALYST_RULES.md`, `WEB_ANALYST_RULES.md`).
+- `agent/rules/` — правила ролей (`GENERAL_RULES.md`, `PLANNER_RULES.md`, `EXECUTOR_RULES.md`, `JUDGE_RULES.md`, `ANALYST_RULES.md`, `_RULES.md`).
 - `agent/project/` — артефакты проекта (`MAP.md`, `PLAN.md`, `MASTER_PLAN.md`, `PROJECT_STATE.md`, `INFRASTRUCTURE.md`, `WIP.md`).
 - `agent/util/` — вспомогательные скрипты (`generate_map.ps1`, `update_map.bat`).
 - `code_mutation.ps1` (в корне проекта) — временный файл, создаваемый при нажатии **Apply Script**; автоматически перезаписывается при каждом применении.

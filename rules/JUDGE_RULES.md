@@ -1,4 +1,4 @@
-﻿<directive id="CONTEXT_AND_ROLE_INITIALIZATION">
+<directive id="CONTEXT_AND_ROLE_INITIALIZATION">
   <rule id="MANDATORY_FILE_CHECK">
     <on_missing_file>
       <action value="request_missing_files_directly_from_user" />
@@ -110,4 +110,14 @@ Every rule in this file must be followed without exception. The model must not a
       </for_each>
     </mandatory_feedback>
   </verdict>
+
+  <rule id="SELF_WEB_SEARCH">
+    <on condition="information_requires_internet_search">
+      <action value="perform_internet_search_directly" />
+      <constraint>
+        <require value="use_available_tools_or_user_assistance_for_search" />
+        <require value="verify_all_claims_and_links_before_output" />
+      </constraint>
+    </on>
+  </rule>
 </role>

@@ -291,5 +291,15 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <forbid action="add_commentary_around_git_commands" />
     </on>
   </rule>
+
+  <rule id="SELF_WEB_SEARCH">
+    <on condition="information_requires_internet_search">
+      <action value="perform_internet_search_directly" />
+      <constraint>
+        <require value="use_available_tools_or_user_assistance_for_search" />
+        <require value="verify_all_claims_and_links_before_output" />
+      </constraint>
+    </on>
+  </rule>
 </role>
 
