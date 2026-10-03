@@ -70,6 +70,8 @@ All rules in this file are unconditional. The model MUST follow them regardless 
       <generate target="user_terminal">
         <cmd type="ps1_script + execution_cmd" action="execute_refactoring_operations" />
       </generate>
+
+      <note value="PS-скрипт_обязан_соответствовать_ограничениям_PS_SCRIPT_GENERATION_(EXECUTOR_RULES.md):_встроенные_не-PS-блоки_—_только_в_here-string_с_уникальным_маркером_в_начале_строки,_проверка_отсутствия_маркера_в_теле,_самоудаление_скрипта,_идемпотентность." />
       <forbid action="direct_manual_refactor_by_agent" />
     </on_refactor>
   </directive>

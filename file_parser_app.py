@@ -21,6 +21,52 @@ from tkinter import ttk, messagebox
 # T1: Project Root Detection & Tree Builder
 # ----------------------------------------------------------------------
 
+
+# ----------------------------------------------------------------------
+# .gitignore-driven ignore rules (generic across projects)
+# ----------------------------------------------------------------------
+
+_GITIGNORE_CACHE = {}
+
+IGNORE_DIRS = {
+    '.git', '__pycache__', 'node_modules', 'venv', '.venv', '.idea',
+    '.mypy_cache', '.pytest_cache', '.ruff_cache',
+}
+IGNORE_FILE_SUFFIXES = ('.db-shm', '.db-wal')
+IGNORE_FILE_EXTENSIONS = (
+    '.safetensors', '.gguf', '.pt', '.pth', '.bin', '.ckpt', '.onnx', '.h5', '.pb',
+)
+IGNORE_EXTRA_PREFIXES = ()
+
+
+def load_gitignore_prefixes(project_root) -> tuple:
+    """Parse .gitignore and return tuple of path prefixes (no trailing slash).
+    Cached per project_root. Wildcards, negations and comments are skipped.
+    """
+    key = str(project_root)
+    if key in _GITIGNORE_CACHE:
+        return _GITIGNORE_CACHE[key]
+    prefixes = []
+    gi = Path(project_root) / '.gitignore'
+    if gi.is_file():
+        try:
+            text = gi.read_text(encoding='utf-8', errors='replace')
+            for raw in text.splitlines():
+                line = raw.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if line.startswith('!'):
+                    continue
+                if '*' in line or '?' in line:
+                    continue
+                p = line.replace('\\', '/').rstrip('/')
+                if p:
+                    prefixes.append(p)
+        except Exception as e:
+            print(f"[WARN] failed to read .gitignore: {e}")
+    result = tuple(prefixes)
+    _GITIGNORE_CACHE[key] = result
+    return result
 def get_project_root() -> Path:
     """Return absolute path to project root (parent of agent/).
     When frozen by PyInstaller and placed in agent/, sys.executable
@@ -33,46 +79,58 @@ def get_project_root() -> Path:
     else:
         return Path(__file__).resolve().parent.parent
 
-def scan_directory(root: Path) -> dict:
-    """
-    Recursively scan root, skipping ignored patterns.
-    Returns nested dict:
-        {"type": "dir", "name": "...", "children": [...]}
-        or {"type": "file", "name": "...", "path": "relative/to/project"}
-    """
-    IGNORE_DIRS = {'.git', '__pycache__', 'node_modules', 'venv', '.idea'}
-    IGNORE_SUFFIXES = ('.db-shm', '.db-wal')
 
-    def _scan(current: Path, rel_parent: str = '') -> dict:
-        try:
-            entries = sorted(current.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
-        except PermissionError:
-            return None  # skip inaccessible directories
-
-        children = []
-        for entry in entries:
-            if entry.name in IGNORE_DIRS:
-                continue
-            if entry.name.endswith(IGNORE_SUFFIXES):
-                continue
-
-            rel_path = str(Path(rel_parent) / entry.name) if rel_parent else entry.name
-
-            if entry.is_dir():
-                result = _scan(entry, rel_path)
-                if result is not None:
-                    children.append({"type": "dir", "name": entry.name, "children": result.get("children", [])})
-                else:
-                    children.append({"type": "dir", "name": entry.name, "children": []})  # empty inaccessible dir
-            else:
-                children.append({"type": "file", "name": entry.name, "path": rel_path})
-        return {"type": "dir", "name": current.name, "children": children}
-
-    root_scan = _scan(root, '')
-    if root_scan is None:
-        return {"type": "dir", "name": root.name, "children": []}
+def scan_directory(root: Path) -> dict:
+    """
+    Recursively scan root, skipping ignored patterns.
+    Ignore rules come from .gitignore + generic IGNORE_DIRS / file extensions.
+    Returns nested dict:
+        {"type": "dir", "name": "...", "children": [...]}
+        or {"type": "file", "name": "...", "path": "relative/to/project"}
+    """
+    gitignore_prefixes = load_gitignore_prefixes(root)
+    all_prefixes = tuple(gitignore_prefixes) + tuple(IGNORE_EXTRA_PREFIXES)
+
+    def _is_ignored_rel(rel_path: str) -> bool:
+        rp = rel_path.replace('\\', '/')
+        for pfx in all_prefixes:
+            if rp == pfx or rp.startswith(pfx + '/'):
+                return True
+        return False
+
+    def _scan(current: Path, rel_parent: str = '') -> dict:
+        try:
+            entries = sorted(current.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
+        except PermissionError:
+            return None  # skip inaccessible directories
+
+        children = []
+        for entry in entries:
+            if entry.name in IGNORE_DIRS:
+                continue
+            if entry.name.endswith(IGNORE_FILE_SUFFIXES):
+                continue
+            if entry.is_file() and entry.name.lower().endswith(IGNORE_FILE_EXTENSIONS):
+                continue
+
+            rel_path = str(Path(rel_parent) / entry.name) if rel_parent else entry.name
+            if _is_ignored_rel(rel_path):
+                continue
+
+            if entry.is_dir():
+                result = _scan(entry, rel_path)
+                if result is not None:
+                    children.append({"type": "dir", "name": entry.name, "children": result.get("children", [])})
+                else:
+                    children.append({"type": "dir", "name": entry.name, "children": []})
+            else:
+                children.append({"type": "file", "name": entry.name, "path": rel_path})
+        return {"type": "dir", "name": current.name, "children": children}
+
+    root_scan = _scan(root, '')
+    if root_scan is None:
+        return {"type": "dir", "name": root.name, "children": []}
     return root_scan
-
 def flatten_tree(tree_dict: dict, parent: str = '') -> list:
     flat = []
     idx = 0
@@ -335,6 +393,13 @@ class FileParserApp:
 
     def __init__(self, root):
         self._insert_row_index = 0   # reset on every populate
+
+        self._populate_generation = 0
+
+        self._populate_after_id = None
+
+        self._populating = False
+
         self.root = root
         self.root.title("File Parser for Multi-Agent")
         self.root.geometry("1300x700")
@@ -510,9 +575,29 @@ class FileParserApp:
     # -----------------------------------------------------------------
     # Tree population (async if needed)
     # -----------------------------------------------------------------
+
     def populate_tree(self):
-        self._insert_row_index = 0
+
         """Scan directory and fill Treeview, asynchronously if large."""
+
+        self._populate_generation += 1
+
+        if self._populate_after_id is not None:
+
+            try:
+
+                self.root.after_cancel(self._populate_after_id)
+
+            except Exception:
+
+                pass
+
+            self._populate_after_id = None
+
+        self._populating = True
+
+        self._insert_row_index = 0
+
         # Clear existing items
         for item in self.tree.get_children():
             self.tree.delete(item)
@@ -533,55 +618,171 @@ class FileParserApp:
         else:
             self._start_async_populate()
 
+
     def _insert_all_sync(self):
+
         self._insert_row_index = 0
+
         for parent_iid, iid, name, is_dir, rel_path in self.flat_list:
+
             parent = parent_iid if parent_iid else ''
+
             tag_list = ["dir" if is_dir else "file"]
+
             tag_list.append("even" if self._insert_row_index % 2 == 0 else "odd")
-            self.tree.insert(parent, tk.END, iid=iid, text=name, values=("☐",),
-                             tags=tuple(tag_list))
+
+            try:
+
+                if self.tree.exists(iid):
+
+                    continue
+
+                self.tree.insert(parent, tk.END, iid=iid, text=name, values=("☐",),
+
+                                 tags=tuple(tag_list))
+
+            except tk.TclError as e:
+
+                print(f"[WARN] sync insert failed for iid={iid}: {e}")
+
+                continue
+
             self.iid_to_relpath[iid] = rel_path if not is_dir else ''
+
             self._insert_row_index += 1
+
+        self._populating = False
+
         self._finalize_populate()
+
+
+
 
     def _start_async_populate(self):
-        """Hide tree, show progressbar, and start chunked insertion."""
-        self.tree.pack_forget()
-        self.tree_visible = False
-        left_frame = self.tree.master
-        self.progressbar = ttk.Progressbar(left_frame, mode='determinate', maximum=len(self.flat_list))
-        self.progressbar.pack(fill=tk.X, padx=5, pady=5)
-        self.root.update_idletasks()
-        self._insert_row_index = 0
-        self._insert_chunk(0)
 
-    def _insert_chunk(self, start_idx, chunk_size=50):
-        end = min(start_idx + chunk_size, len(self.flat_list))
-        for i in range(start_idx, end):
-            parent_iid, iid, name, is_dir, rel_path = self.flat_list[i]
-            parent = parent_iid if parent_iid else ''
-            tag_list = ["dir" if is_dir else "file"]
-            tag_list.append("even" if self._insert_row_index % 2 == 0 else "odd")
-            self.tree.insert(parent, tk.END, iid=iid, text=name, values=("☐",),
-                             tags=tuple(tag_list))
-            self.iid_to_relpath[iid] = rel_path if not is_dir else ''
-            self._insert_row_index += 1
-        self.progressbar['value'] = end
+        """Hide tree, show progressbar, and start chunked insertion."""
+
+        self._populating = True
+
+        self.tree.pack_forget()
+
+        self.tree_visible = False
+
+        left_frame = self.tree.master
+
+        if self.progressbar is not None:
+
+            try:
+
+                self.progressbar.destroy()
+
+            except Exception:
+
+                pass
+
+        self.progressbar = ttk.Progressbar(left_frame, mode='determinate', maximum=len(self.flat_list))
+
+        self.progressbar.pack(fill=tk.X, padx=5, pady=5)
+
         self.root.update_idletasks()
+
+        self._insert_row_index = 0
+
+        gen = self._populate_generation
+
+        self._insert_chunk(0, 50, gen)
+
+
+
+
+    def _insert_chunk(self, start_idx, chunk_size=50, generation=None):
+
+        self._populate_after_id = None
+
+        if generation is not None and generation != self._populate_generation:
+
+            return
+
+        end = min(start_idx + chunk_size, len(self.flat_list))
+
+        for i in range(start_idx, end):
+
+            parent_iid, iid, name, is_dir, rel_path = self.flat_list[i]
+
+            parent = parent_iid if parent_iid else ''
+
+            tag_list = ["dir" if is_dir else "file"]
+
+            tag_list.append("even" if self._insert_row_index % 2 == 0 else "odd")
+
+            try:
+
+                if self.tree.exists(iid):
+
+                    continue
+
+                self.tree.insert(parent, tk.END, iid=iid, text=name, values=("☐",),
+
+                                 tags=tuple(tag_list))
+
+            except tk.TclError as e:
+
+                print(f"[WARN] async insert failed for iid={iid}: {e}")
+
+                continue
+
+            self.iid_to_relpath[iid] = rel_path if not is_dir else ''
+
+            self._insert_row_index += 1
+
+        if self.progressbar is not None:
+
+            try:
+
+                self.progressbar['value'] = end
+
+            except Exception:
+
+                pass
+
+        self.root.update_idletasks()
+
         if end < len(self.flat_list):
-            self.root.after(10, lambda: self._insert_chunk(end, chunk_size))
+
+            self._populate_after_id = self.root.after(10, lambda: self._insert_chunk(end, chunk_size, generation))
+
         else:
+
             self._finalize_async_populate()
 
+
+
+
     def _finalize_async_populate(self):
+
         """Clean up progressbar, show tree, finalize states."""
+
         if self.progressbar:
-            self.progressbar.destroy()
+
+            try:
+
+                self.progressbar.destroy()
+
+            except Exception:
+
+                pass
+
             self.progressbar = None
+
         self.tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
         self.tree_visible = True
+
+        self._populating = False
+
         self._finalize_populate()
+
+
 
     def _finalize_populate(self):
         """Set check states, open root nodes, etc."""
@@ -801,23 +1002,55 @@ class FileParserApp:
     def _start_polling(self):
         self.root.after(self._poll_interval_ms, self._poll_refresh)
 
-    def _get_current_file_set(self) -> frozenset:
-        """Return frozenset of all relative file paths using os.walk, respecting ignore rules."""
-        IGNORE_DIRS = {'.git', '__pycache__', 'node_modules', 'venv', '.idea'}
-        IGNORE_SUFFIXES = ('.db-shm', '.db-wal')
-        file_set = set()
-        for dirpath, dirnames, filenames in os.walk(self.project_root):
-            dirnames[:] = [d for d in dirnames if d not in IGNORE_DIRS]
-            for f in filenames:
-                if f.endswith(IGNORE_SUFFIXES):
-                    continue
-                abs_path = os.path.join(dirpath, f)
-                rel_path = os.path.relpath(abs_path, self.project_root)
-                file_set.add(rel_path)
-        return frozenset(file_set)
 
+
+    def _get_current_file_set(self) -> frozenset:
+        """Return frozenset of all relative file paths using os.walk, respecting ignore rules."""
+        gitignore_prefixes = load_gitignore_prefixes(self.project_root)
+        all_prefixes = tuple(gitignore_prefixes) + tuple(IGNORE_EXTRA_PREFIXES)
+
+        def _is_ignored_rel(rp: str) -> bool:
+            rp_norm = rp.replace('\\', '/')
+            for pfx in all_prefixes:
+                if rp_norm == pfx or rp_norm.startswith(pfx + '/'):
+                    return True
+            return False
+
+        file_set = set()
+        for dirpath, dirnames, filenames in os.walk(self.project_root):
+            rel_dir_raw = os.path.relpath(dirpath, self.project_root)
+            rel_dir = rel_dir_raw.replace('\\', '/')
+            if rel_dir == '.':
+                rel_dir = ''
+            new_dirnames = []
+            for d in dirnames:
+                if d in IGNORE_DIRS:
+                    continue
+                sub_rel = (rel_dir + '/' + d) if rel_dir else d
+                if _is_ignored_rel(sub_rel):
+                    continue
+                new_dirnames.append(d)
+            dirnames[:] = new_dirnames
+            for f in filenames:
+                if f.endswith(IGNORE_FILE_SUFFIXES):
+                    continue
+                if f.lower().endswith(IGNORE_FILE_EXTENSIONS):
+                    continue
+                abs_path = os.path.join(dirpath, f)
+                rel_path = os.path.relpath(abs_path, self.project_root)
+                if _is_ignored_rel(rel_path):
+                    continue
+                file_set.add(rel_path)
+        return frozenset(file_set)
     def _poll_refresh(self):
         """Check for filesystem changes and rebuild tree if mismatch detected."""
+
+        if self._populating:
+
+            self.root.after(self._poll_interval_ms, self._poll_refresh)
+
+            return
+
         try:
             current_files = self._get_current_file_set()
             tree_files = {rel for rel in self.iid_to_relpath.values() if rel}
@@ -835,6 +1068,41 @@ class FileParserApp:
 
     def _rebuild_tree_preserving_selection(self):
         """Synchronously rebuild tree while restoring checked files that still exist."""
+
+        self._populate_generation += 1
+
+        if self._populate_after_id is not None:
+
+            try:
+
+                self.root.after_cancel(self._populate_after_id)
+
+            except Exception:
+
+                pass
+
+            self._populate_after_id = None
+
+        self._populating = True
+
+        if not self.tree_visible:
+
+            if self.progressbar is not None:
+
+                try:
+
+                    self.progressbar.destroy()
+
+                except Exception:
+
+                    pass
+
+                self.progressbar = None
+
+            self.tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+            self.tree_visible = True
+
         # Save checked file paths
         checked_paths = set()
         for iid, rel in self.iid_to_relpath.items():
@@ -879,11 +1147,27 @@ class FileParserApp:
                 checked.append(rel_path)
         return checked
 
+
+    MAX_READ_BYTES = 500 * 1024 * 1024  # 500 MB: refuse to attach huge binaries
+
+
+
     def _read_file_safe(self, rel_path: str) -> str:
+
         abs_path = self.project_root / rel_path
+
         try:
+
+            size = abs_path.stat().st_size
+
+            if size > self.MAX_READ_BYTES:
+
+                raise IOError(f"File too large to attach: {rel_path} ({size} bytes > {self.MAX_READ_BYTES})")
+
             with open(abs_path, 'rb') as f:
+
                 raw = f.read()
+
             result = chardet.detect(raw)
             encoding = result.get('encoding')
             confidence = result.get('confidence', 0)

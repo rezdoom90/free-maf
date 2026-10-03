@@ -146,6 +146,19 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
       <forbid action="HERESTRING_FULL_FILE_REWRITE" value="запрещена_полная_перезапись_исходников_через_here-string_+_WriteAllText" />
       <forbid action="UTF8_BOM_FOR_JAVA_OR_MD_TARGETS" value="запрещено_добавлять_UTF-8_BOM_в_целевые_Java_или_Markdown-файлы" />
       <forbid action="HEURISTIC_BLANK_LINE_COLLAPSE" value="запрещена_эвристическая_нормализация_пустых_строк_без_эталонного_массива_строк" />
+
+      <forbid action="NON_PS_CONTENT_IN_SCRIPT_BODY" value="вставка_любого_не-PowerShell_контента_(Markdown,_JSON,_XML,_текст_задачи,_отрывки_из_TASK.md_/_RESULT.md_/_PLAN.md_/_WIP.md)_в_тело_скрипта_вне_here-string_(@'...'@_/_@&quot;...&quot;@)" />
+
+      <require id="HERESTRING_WRAP_BUILTIN_BLOCKS" value="любой_встроенный_блок_оборачивается_в_here-string;_закрывающий_маркер_('@_или_&quot;@)_обязан_находиться_в_начале_строки" />
+
+      <require id="UNIQUE_HERESTRING_MARKER" value="встроенный_блок_должен_иметь_уникальный_маркер;_перед_генерацией_выполняется_проверка,_что_строка-маркер_('@_/_&quot;@_в_начале_строки)_отсутствует_в_теле_встраиваемого_контента;_при_обнаружении_—_перегенерировать_блок_с_иным_маркером" />
+
+      <note value="code_mutation.ps1_самоудаляется_после_выполнения._Частичная_правка_невозможна;_любое_исправление_=_полная_регенерация_скрипта,_повторяющего_работу_с_нуля;_идемпотентность_обязательна." />
+      <require id="PROGRESS_WATCHDOG" value="каждый_PS-скрипт_обязан_содержать_time-based_watchdog_с_интервалом_не_более_60_секунд;_watchdog_проверяет_изменение_целевого_артефакта_(размер_файла,_счётчик_записей,_вывод_процесса)_между_тиками;_при_отсутствии_прогресса_в_течение_одного_интервала_—_принудительное_завершение_внешнего_процесса_(Stop-Process_-Force)_и_остановка_скрипта_с_ошибкой" />
+      <require id="WATCHDOG_IMPLEMENTATION" value="использовать_$proc.WaitForExit(ms)_для_ожидания_с_таймаутом_вместо_Start-Sleep;_обязательно_вызывать_$proc.Refresh()_перед_проверкой_$proc.HasExited;_запрещено_полагаться_на_curl_--speed-time/--max-time_как_на_единственный_защитный_механизм_(не_срабатывает_при_half-open_TCP)" />
+      <require id="WATCHDOG_FAIL_FAST" value="при_срабатывании_watchdog_скрипт_завершается_с_status=fail,_записывает_детальный_лог_всех_тиков_в_agent/cache/&lt;operation&gt;.log_и_НЕ_пытается_бесконечно_рестартовать_зависшую_операцию;_повтор_допустим_только_если_каждый_повтор_фиксирует_фактический_прогресс_(увеличение_размера_файла_или_иной_измеримый_признак)" />
+      <forbid action="SILENT_HANG" value="запрещено_оставлять_долгоживущие_операции_(curl,_wget,_скачивание_моделей,_выполнение_внешних_процессов_дольше_60_секунд)_без_time-based_watchdog;_отсутствие_watchdog_—_блокирующий_дефект_скрипта" />
+
     </constraints>
   </rule>
 
@@ -292,14 +305,22 @@ All rules in GENERAL_RULES.md and this file must be followed unconditionally. Ne
     </on>
   </rule>
 
-  <rule id="SELF_WEB_SEARCH">
-    <on condition="information_requires_internet_search">
-      <action value="perform_internet_search_directly" />
-      <constraint>
-        <require value="use_available_tools_or_user_assistance_for_search" />
-        <require value="verify_all_claims_and_links_before_output" />
-      </constraint>
-    </on>
+  <rule id="SELF_WEB_SEARCH">
+
+    <on condition="information_requires_internet_search">
+
+      <action value="perform_internet_search_directly" />
+
+      <constraint>
+
+        <require value="use_available_tools_or_user_assistance_for_search" />
+
+        <require value="verify_all_claims_and_links_before_output" />
+
+      </constraint>
+
+    </on>
+
   </rule>
 </role>
 
